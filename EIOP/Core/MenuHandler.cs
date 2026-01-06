@@ -20,9 +20,11 @@ public class MenuHandler : MonoBehaviour
     public GameObject Menu;
     private bool wasPressed;
 
-    // Define your colors here so they are easy to change later
-    private Color CustomGreen = Color.green; // Bright Green
-    private Color CustomDarkGreen = new Color(0.0f, 0.25f, 0.0f, 1.0f); // Dark Forest Green
+    // --- COLORS ---
+    // Bright Green for the bars
+    private Color BarColor = Color.green; 
+    // Dark Green for the background and buttons
+    private Color BaseColor = new Color(0.0f, 0.2f, 0.0f, 1.0f); 
 
     private void Start()
     {
@@ -35,25 +37,33 @@ public class MenuHandler : MonoBehaviour
         Menu.transform.localRotation = BaseMenuRotation;
         Menu.transform.localScale    = Vector3.zero;
 
-        // 1. Apply Shaders first
+        // 1. Fix Shaders first
         PerformShaderManagement(Menu);
 
-        // 2. Apply Colors
+        // 2. Color the Main Menu Background
         Renderer mainRenderer = Menu.GetComponent<Renderer>();
-        Renderer panelRenderer = Menu.transform.Find("ModePanel").GetComponent<Renderer>();
-
         if (mainRenderer != null)
-            mainRenderer.material.color = CustomDarkGreen; // Main Menu Background
+        {
+            mainRenderer.material.color = BaseColor; // Dark Green
+        }
 
-        if (panelRenderer != null)
-            panelRenderer.material.color = CustomGreen;    // Side/Bottom Bars
+        // 3. Color the Side/Bottom Bars (ModePanel)
+        Transform panelTrans = Menu.transform.Find("ModePanel");
+        if (panelTrans != null)
+        {
+            Renderer panelRenderer = panelTrans.GetComponent<Renderer>();
+            if (panelRenderer != null)
+            {
+                panelRenderer.material.color = BarColor; // Bright Green
+            }
+        }
 
-        // Update Plugin Globals
-        Plugin.MainColour      = CustomDarkGreen;
-        Plugin.SecondaryColour = CustomGreen;
+        // Set global colors for other scripts to use
+        Plugin.MainColour      = BaseColor;
+        Plugin.SecondaryColour = BarColor;
 
         Menu.SetActive(false);
-        SetUpTabs();
+        SetUpTabs(); // Buttons are colored inside here now
 
         gameObject.AddComponent<PCHandler>().MenuHandlerInstance = this;
     }
@@ -103,11 +113,23 @@ public class MenuHandler : MonoBehaviour
                 continue;
             }
 
-            // COLOR THE BUTTONS HERE
-            if (tabButton.TryGetComponent(out Renderer btnRenderer))
+            // --- FIX: COLORING THE BUTTONS ---
+            // We use GetComponentInChildren because the Renderer might be inside the button object
+            Renderer btnRenderer = tabButton.GetComponentInChildren<Renderer>();
+            if (btnRenderer != null)
             {
-                btnRenderer.material.color = CustomDarkGreen;
+                // Make buttons Dark Green so they stand out against the Bright Green bar
+                btnRenderer.material.color = BaseColor; 
             }
+            else 
+            {
+                // Backup: try to color the object itself if no children found
+                if(tabButton.TryGetComponent(out Renderer directRenderer))
+                {
+                    directRenderer.material.color = BaseColor;
+                }
+            }
+            // ---------------------------------
 
             EIOPButton button = tabButton.gameObject.AddComponent<EIOPButton>();
             button.OnPress = () =>
