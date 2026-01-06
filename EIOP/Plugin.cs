@@ -11,7 +11,7 @@ using EIOP.Tools;
 using HarmonyLib;
 using Newtonsoft.Json;
 using UnityEngine;
-using UnityEngine.Networking; // Required for the fix
+using UnityEngine.Networking;
 
 namespace EIOP;
 
@@ -33,6 +33,9 @@ public class Plugin : BaseUnityPlugin
 
     public static AudioSource PluginAudioSource;
 
+    // Prevents the mod from loading twice if the player joins a new room
+    private bool _initialized = false;
+
     private void Start()
     {
         new Harmony(Constants.PluginGuid).PatchAll();
@@ -47,10 +50,14 @@ public class Plugin : BaseUnityPlugin
 
     private void OnGameInitialized()
     {
+        // SAFETY CHECK: Stop if we have already loaded
+        if (_initialized) return;
+        _initialized = true;
+
         PCHandler.ThirdPersonCameraTransform = GorillaTagger.Instance.thirdPersonCamera.transform.GetChild(0);
         PCHandler.ThirdPersonCamera          = PCHandler.ThirdPersonCameraTransform.GetComponent<Camera>();
 
-        // FIX: Check if resource exists before loading to prevent crash
+        // Load Asset Bundle Safely
         Stream bundleStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("EIOP.Resources.eiopbundle");
         if (bundleStream != null)
         {
@@ -59,7 +66,8 @@ public class Plugin : BaseUnityPlugin
         }
         else
         {
-            Logger.LogError("EIOP: Could not find embedded resource 'EIOP.Resources.eiopbundle'. Make sure Build Action is set to Embedded Resource.");
+            Logger.LogError("EIOP: Critical Error - Could not find 'EIOP.Resources.eiopbundle'. Did you set Build Action to Embedded Resource?");
+            return; // Stop loading if bundle is missing
         }
 
         UberShader = Shader.Find("GorillaTag/UberShader");
@@ -70,6 +78,7 @@ public class Plugin : BaseUnityPlugin
         PluginAudioSource.spatialBlend = 0f;
         PluginAudioSource.playOnAwake  = false;
 
+        // Load AntiCheat Handlers
         Type[] antiCheatHandlers = Assembly.GetExecutingAssembly().GetTypes()
                                            .Where(t => t.IsClass && !t.IsAbstract &&
                                                        typeof(AntiCheatHandlerBase).IsAssignableFrom(t)).ToArray();
@@ -77,16 +86,16 @@ public class Plugin : BaseUnityPlugin
         foreach (Type antiCheatHandlerType in antiCheatHandlers)
             gameObject.AddComponent(antiCheatHandlerType);
 
+        // Load Core Components
         gameObject.AddComponent<CoroutineManager>();
         gameObject.AddComponent<EIOPUtils>();
         gameObject.AddComponent<Notifications>();
         gameObject.AddComponent<MenuHandler>();
 
-        // FIX: Start Coroutine instead of blocking the thread
+        // Start Web Request without freezing game
         StartCoroutine(FetchModsAndCheatsCoroutine());
     }
 
-    // FIX: Replaced synchronous HttpClient with UnityWebRequest Coroutine
     private IEnumerator FetchModsAndCheatsCoroutine()
     {
         // Fetch Known Cheats
@@ -144,7 +153,7 @@ public class Plugin : BaseUnityPlugin
             return null;
         }
 
-        // FIX: Ensure complete read of the stream
+        // Read stream into a full byte array
         byte[] buffer;
         using (MemoryStream ms = new MemoryStream())
         {
