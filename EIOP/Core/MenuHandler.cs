@@ -13,15 +13,16 @@ namespace EIOP.Core;
 public class MenuHandler : MonoBehaviour
 {
     public static readonly Vector3 TargetMenuScale = Vector3.one * 15f;
-
-    public static readonly Vector3    BaseMenuPosition = new(0.25f, 0f, 0.05f);
+    public static readonly Vector3 BaseMenuPosition = new(0.25f, 0f, 0.05f);
     public static readonly Quaternion BaseMenuRotation = Quaternion.Euler(300f, 0f, 180f);
 
     public bool IsMenuOpen;
-
     public GameObject Menu;
-
     private bool wasPressed;
+
+    // Define your colors here so they are easy to change later
+    private Color CustomGreen = Color.green; // Bright Green
+    private Color CustomDarkGreen = new Color(0.0f, 0.25f, 0.0f, 1.0f); // Dark Forest Green
 
     private void Start()
     {
@@ -34,11 +35,24 @@ public class MenuHandler : MonoBehaviour
         Menu.transform.localRotation = BaseMenuRotation;
         Menu.transform.localScale    = Vector3.zero;
 
-        Plugin.MainColour      = Menu.GetComponent<Renderer>().material.color;
-        Plugin.SecondaryColour = Menu.transform.Find("ModePanel").GetComponent<Renderer>().material.color;
-        Menu.SetActive(false);
-
+        // 1. Apply Shaders first
         PerformShaderManagement(Menu);
+
+        // 2. Apply Colors
+        Renderer mainRenderer = Menu.GetComponent<Renderer>();
+        Renderer panelRenderer = Menu.transform.Find("ModePanel").GetComponent<Renderer>();
+
+        if (mainRenderer != null)
+            mainRenderer.material.color = CustomDarkGreen; // Main Menu Background
+
+        if (panelRenderer != null)
+            panelRenderer.material.color = CustomGreen;    // Side/Bottom Bars
+
+        // Update Plugin Globals
+        Plugin.MainColour      = CustomDarkGreen;
+        Plugin.SecondaryColour = CustomGreen;
+
+        Menu.SetActive(false);
         SetUpTabs();
 
         gameObject.AddComponent<PCHandler>().MenuHandlerInstance = this;
@@ -86,8 +100,13 @@ public class MenuHandler : MonoBehaviour
             if (tabView == null || tabButton == null)
             {
                 Debug.LogWarning($"[MenuHandler] Could not find View or Button for tab: {tabName}");
-
                 continue;
+            }
+
+            // COLOR THE BUTTONS HERE
+            if (tabButton.TryGetComponent(out Renderer btnRenderer))
+            {
+                btnRenderer.material.color = CustomDarkGreen;
             }
 
             EIOPButton button = tabButton.gameObject.AddComponent<EIOPButton>();
