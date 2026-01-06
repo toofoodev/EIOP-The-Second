@@ -7,6 +7,7 @@ using EIOP.Tab_Handlers;
 using EIOP.Tools;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace EIOP.Core;
 
@@ -21,8 +22,10 @@ public class MenuHandler : MonoBehaviour
     private bool wasPressed;
 
     // --- COLORS ---
-    private Color BarColor = Color.green; // Bright Green (Side/Bottom bars)
-    private Color BaseColor = new Color(0.0f, 0.2f, 0.0f, 1.0f); // Dark Green (Background/Buttons)
+    // Background Color (Bright Green)
+    private Color BrightGreen = Color.green; 
+    // Button Color (Dark Green)
+    private Color DarkGreen = new Color(0.0f, 0.2f, 0.0f, 1.0f); 
 
     private void Start()
     {
@@ -35,33 +38,49 @@ public class MenuHandler : MonoBehaviour
         Menu.transform.localRotation = BaseMenuRotation;
         Menu.transform.localScale    = Vector3.zero;
 
-        // 1. Fix Shaders
+        // 1. Fix Shaders & Preserve Icons
         PerformShaderManagement(Menu);
 
-        // 2. Apply Main Background Colors
-        Renderer mainRenderer = Menu.GetComponent<Renderer>();
-        if (mainRenderer != null) mainRenderer.material.color = BaseColor; 
+        // 2. Apply Background Colors (Everything Bright Green)
+        ApplyBackgroundColors();
 
-        Transform panelTrans = Menu.transform.Find("ModePanel");
-        if (panelTrans != null)
-        {
-            Renderer panelRenderer = panelTrans.GetComponent<Renderer>();
-            if (panelRenderer != null) panelRenderer.material.color = BarColor;
-        }
-
-        Plugin.MainColour      = BaseColor;
-        Plugin.SecondaryColour = BarColor;
-
-        // 3. FORCE COLOR ALL BUTTONS (Fixes ButtonType1, ButtonType2, SoundboardButton)
+        // 3. Color ALL Buttons (Everything Dark Green)
         ColorAllButtonsInMenu();
 
-        // 4. Update Title Text
-        UpdateTitleText(panelTrans);
+        // 4. Fix Title Text
+        UpdateTitleText();
 
         Menu.SetActive(false);
         SetUpTabs();
 
         gameObject.AddComponent<PCHandler>().MenuHandlerInstance = this;
+    }
+
+    private void ApplyBackgroundColors()
+    {
+        // Main Background -> Bright Green
+        Renderer mainRenderer = Menu.GetComponent<Renderer>();
+        if (mainRenderer != null) mainRenderer.material.color = BrightGreen;
+
+        // ModePanel (Bottom Bar) -> Bright Green
+        Transform modePanel = Menu.transform.Find("ModePanel");
+        if (modePanel != null)
+        {
+            Renderer panelRenderer = modePanel.GetComponent<Renderer>();
+            if (panelRenderer != null) panelRenderer.material.color = BrightGreen;
+        }
+
+        // SidePanel (Side Bar) -> Bright Green
+        Transform sidePanel = Menu.transform.Find("SidePanel");
+        if (sidePanel != null)
+        {
+            Renderer sideRenderer = sidePanel.GetComponent<Renderer>();
+            if (sideRenderer != null) sideRenderer.material.color = BrightGreen;
+        }
+
+        // Update Global Settings
+        Plugin.MainColour      = BrightGreen;
+        Plugin.SecondaryColour = DarkGreen;
     }
 
     private void ColorAllButtonsInMenu()
@@ -72,25 +91,49 @@ public class MenuHandler : MonoBehaviour
         foreach (Renderer rend in allRenderers)
         {
             string objName = rend.gameObject.name;
-            string parentName = rend.transform.parent != null ? rend.transform.parent.name : "";
+            Transform parent = rend.transform.parent;
+            string parentName = parent != null ? parent.name : "";
 
-            // Check for specific names you mentioned or general "Button" names
+            // --- CHECK IF THIS IS AN ICON ---
+            // If it has a texture, it's likely an Icon. Keep it white so it's visible.
+            if (rend.material.mainTexture != null) 
+            {
+                rend.material.color = Color.white; 
+                continue;
+            }
+
+            // --- COLORING LOGIC ---
+            
+            // 1. Buttons inside ModePanel OR SidePanel
+            bool isBarButton = parentName.Equals("ModePanel", StringComparison.OrdinalIgnoreCase) || 
+                               parentName.Equals("SidePanel", StringComparison.OrdinalIgnoreCase);
+
+            if (isBarButton)
+            {
+                rend.material.color = DarkGreen; // Dark button on Bright background
+                continue;
+            }
+
+            // 2. Main Menu Buttons & Specific Fixes
             bool isButton = objName.Contains("Button") || parentName.Contains("Button");
             bool isSpecificType = objName.Equals("ButtonType1") || objName.Equals("ButtonType2") || objName.Equals("SoundboardButton");
 
-            // If it matches, color it Dark Green
             if (isButton || isSpecificType)
             {
-                rend.material.color = BaseColor;
+                rend.material.color = DarkGreen; // Dark button on Bright background
             }
         }
     }
 
-    private void UpdateTitleText(Transform panelTrans)
+    private void UpdateTitleText()
     {
+        Transform modePanel = Menu.transform.Find("ModePanel");
+        Transform sidePanel = Menu.transform.Find("SidePanel");
+        
         // Find Title Object
         Transform textObj = Menu.transform.Find("BlatantPromo");
-        if (textObj == null && panelTrans != null) textObj = panelTrans.Find("BlatantPromo");
+        if (textObj == null && modePanel != null) textObj = modePanel.Find("BlatantPromo");
+        if (textObj == null && sidePanel != null) textObj = sidePanel.Find("BlatantPromo");
         if (textObj == null) textObj = Menu.transform.Find("Title");
 
         if (textObj != null)
@@ -102,8 +145,10 @@ public class MenuHandler : MonoBehaviour
                 textComp.alignment = TextAlignmentOptions.Center;
                 textComp.enableAutoSizing = true;
                 textComp.fontSizeMin = 0.1f;
-                textComp.fontSizeMax = 10f;
-                textComp.color = Color.white;
+                textComp.fontSizeMax = 8f;
+                // Text needs to be Black or Dark Green to be visible on Bright Green background?
+                // Or White if you prefer. I'll stick to White, but if it's hard to read, change to Color.black
+                textComp.color = Color.white; 
             }
         }
     }
@@ -131,10 +176,22 @@ public class MenuHandler : MonoBehaviour
                                        .Where(t => t.gameObject.name.EndsWith("View",
                                                       StringComparison.OrdinalIgnoreCase)).ToList();
 
+        // Gather buttons from BOTH ModePanel AND SidePanel
+        List<Transform> tabButtons = new List<Transform>();
+
         Transform modePanel = Menu.transform.Find("ModePanel");
-        List<Transform> tabButtons = modePanel.GetComponentsInChildren<Transform>(true)
-                                              .Where(t => t.gameObject.name.EndsWith("Button",
-                                                             StringComparison.OrdinalIgnoreCase)).ToList();
+        if (modePanel != null)
+        {
+            tabButtons.AddRange(modePanel.GetComponentsInChildren<Transform>(true)
+                                  .Where(t => t.gameObject.name.EndsWith("Button", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        Transform sidePanel = Menu.transform.Find("SidePanel");
+        if (sidePanel != null)
+        {
+            tabButtons.AddRange(sidePanel.GetComponentsInChildren<Transform>(true)
+                                  .Where(t => t.gameObject.name.EndsWith("Button", StringComparison.OrdinalIgnoreCase)));
+        }
 
         foreach (Type tabHandlerType in tabHandlerTypes)
         {
@@ -145,11 +202,10 @@ public class MenuHandler : MonoBehaviour
 
             if (tabView == null || tabButton == null)
             {
-                Debug.LogWarning($"[MenuHandler] Missing View/Button for: {tabName}");
-                continue;
+                continue; 
             }
 
-            // --- RENAME BUTTONS ---
+            // Rename Buttons logic
             TextMeshPro btnText = tabButton.GetComponentInChildren<TextMeshPro>();
             if (btnText != null)
             {
@@ -180,24 +236,52 @@ public class MenuHandler : MonoBehaviour
         foreach (Transform child in obj.transform)
             PerformShaderManagement(child.gameObject);
 
+        // 1. HANDLE RENDERERS (Buttons, Backgrounds, Icons)
         if (obj.TryGetComponent(out Renderer renderer))
-            if (renderer.material.shader.name.Contains("Universal"))
+        {
+            if (!(renderer is ParticleSystemRenderer))
             {
-                renderer.material.shader = Plugin.UberShader;
-                if (renderer.material.mainTexture != null) renderer.material.EnableKeyword("_USE_TEXTURE");
-            }
+                // Save the existing texture (Icon) before switching shaders
+                Texture originalTexture = renderer.material.mainTexture;
+                
+                // If mainTexture is null, check for URP properties (_BaseMap)
+                if (originalTexture == null && renderer.material.HasProperty("_BaseMap"))
+                    originalTexture = renderer.material.GetTexture("_BaseMap");
 
+                // Apply UberShader
+                renderer.material.shader = Plugin.UberShader;
+                
+                // Re-apply the texture so the Icon appears
+                if (originalTexture != null)
+                {
+                    renderer.material.mainTexture = originalTexture;
+                    renderer.material.EnableKeyword("_USE_TEXTURE");
+                }
+                
+                // Default to white so texture isn't tinted invisible.
+                renderer.material.color = Color.white; 
+            }
+        }
+
+        // 2. HANDLE 3D TEXT
         if (obj.TryGetComponent(out TextMeshPro tmp))
+        {
             tmp.fontMaterial = new Material(tmp.fontMaterial)
             {
-                    shader = Shader.Find("TextMeshPro/Mobile/Distance Field"),
+                shader = Shader.Find("TextMeshPro/Mobile/Distance Field")
             };
+            tmp.color = Color.white; 
+        }
 
+        // 3. HANDLE UI TEXT
         if (obj.TryGetComponent(out TextMeshProUGUI tmpUGUI))
+        {
             tmpUGUI.fontMaterial = new Material(tmpUGUI.fontMaterial)
             {
-                    shader = Shader.Find("TextMeshPro/Mobile/Distance Field"),
+                shader = Shader.Find("TextMeshPro/Mobile/Distance Field")
             };
+            tmpUGUI.color = Color.white;
+        }
     }
 
     public IEnumerator OpenMenu()
