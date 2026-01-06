@@ -38,7 +38,7 @@ public class MenuHandler : MonoBehaviour
         // 1. Fix Shaders
         PerformShaderManagement(Menu);
 
-        // 2. Apply Colors
+        // 2. Apply Main Background Colors
         Renderer mainRenderer = Menu.GetComponent<Renderer>();
         if (mainRenderer != null) mainRenderer.material.color = BaseColor; 
 
@@ -52,15 +52,45 @@ public class MenuHandler : MonoBehaviour
         Plugin.MainColour      = BaseColor;
         Plugin.SecondaryColour = BarColor;
 
-        // ----------------------------------------------------
-        // CHANGE BLATANT PROMO / TITLE TEXT
-        // ----------------------------------------------------
-        // We look for "BlatantPromo" first, if not found, we fallback to "Title"
+        // 3. FORCE COLOR ALL BUTTONS (Fixes ButtonType1, ButtonType2, SoundboardButton)
+        ColorAllButtonsInMenu();
+
+        // 4. Update Title Text
+        UpdateTitleText(panelTrans);
+
+        Menu.SetActive(false);
+        SetUpTabs();
+
+        gameObject.AddComponent<PCHandler>().MenuHandlerInstance = this;
+    }
+
+    private void ColorAllButtonsInMenu()
+    {
+        // Get EVERY Renderer inside the menu
+        Renderer[] allRenderers = Menu.GetComponentsInChildren<Renderer>(true);
+
+        foreach (Renderer rend in allRenderers)
+        {
+            string objName = rend.gameObject.name;
+            string parentName = rend.transform.parent != null ? rend.transform.parent.name : "";
+
+            // Check for specific names you mentioned or general "Button" names
+            bool isButton = objName.Contains("Button") || parentName.Contains("Button");
+            bool isSpecificType = objName.Equals("ButtonType1") || objName.Equals("ButtonType2") || objName.Equals("SoundboardButton");
+
+            // If it matches, color it Dark Green
+            if (isButton || isSpecificType)
+            {
+                rend.material.color = BaseColor;
+            }
+        }
+    }
+
+    private void UpdateTitleText(Transform panelTrans)
+    {
+        // Find Title Object
         Transform textObj = Menu.transform.Find("BlatantPromo");
-        
-        // If not found in root, check inside ModePanel
         if (textObj == null && panelTrans != null) textObj = panelTrans.Find("BlatantPromo");
-        // Fallback to "Title" if BlatantPromo doesn't exist
         if (textObj == null) textObj = Menu.transform.Find("Title");
 
         if (textObj != null)
@@ -68,27 +98,14 @@ public class MenuHandler : MonoBehaviour
             TextMeshPro textComp = textObj.GetComponent<TextMeshPro>();
             if (textComp != null) 
             {
-                // Set the specific text requested
                 textComp.text = "EIOP: (Everything In One Place)\nEdited by: WesGoof & Pico\nOriginal Mod: HanSolo1000Falcon";
-                
-                // Center the text
                 textComp.alignment = TextAlignmentOptions.Center;
-                
-                // Optional: Adjust font size so it fits nicely
                 textComp.enableAutoSizing = true;
                 textComp.fontSizeMin = 0.1f;
                 textComp.fontSizeMax = 10f;
-                
-                // Optional: Make text white so it is visible on green
                 textComp.color = Color.white;
             }
         }
-        // ----------------------------------------------------
-
-        Menu.SetActive(false);
-        SetUpTabs();
-
-        gameObject.AddComponent<PCHandler>().MenuHandlerInstance = this;
     }
 
     private void Update()
@@ -131,11 +148,6 @@ public class MenuHandler : MonoBehaviour
                 Debug.LogWarning($"[MenuHandler] Missing View/Button for: {tabName}");
                 continue;
             }
-
-            // --- COLOR BUTTONS ---
-            Renderer btnRenderer = tabButton.GetComponentInChildren<Renderer>();
-            if (btnRenderer != null) btnRenderer.material.color = BaseColor;
-            else if (tabButton.TryGetComponent(out Renderer directRenderer)) directRenderer.material.color = BaseColor;
 
             // --- RENAME BUTTONS ---
             TextMeshPro btnText = tabButton.GetComponentInChildren<TextMeshPro>();
