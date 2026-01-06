@@ -21,10 +21,8 @@ public class MenuHandler : MonoBehaviour
     private bool wasPressed;
 
     // --- COLORS ---
-    // Bright Green for the bars
-    private Color BarColor = Color.green; 
-    // Dark Green for the background and buttons
-    private Color BaseColor = new Color(0.0f, 0.2f, 0.0f, 1.0f); 
+    private Color BarColor = Color.green; // Bright Green (Side/Bottom bars)
+    private Color BaseColor = new Color(0.0f, 0.2f, 0.0f, 1.0f); // Dark Green (Background/Buttons)
 
     private void Start()
     {
@@ -37,33 +35,58 @@ public class MenuHandler : MonoBehaviour
         Menu.transform.localRotation = BaseMenuRotation;
         Menu.transform.localScale    = Vector3.zero;
 
-        // 1. Fix Shaders first
+        // 1. Fix Shaders
         PerformShaderManagement(Menu);
 
-        // 2. Color the Main Menu Background
+        // 2. Apply Colors
         Renderer mainRenderer = Menu.GetComponent<Renderer>();
-        if (mainRenderer != null)
-        {
-            mainRenderer.material.color = BaseColor; // Dark Green
-        }
+        if (mainRenderer != null) mainRenderer.material.color = BaseColor; 
 
-        // 3. Color the Side/Bottom Bars (ModePanel)
         Transform panelTrans = Menu.transform.Find("ModePanel");
         if (panelTrans != null)
         {
             Renderer panelRenderer = panelTrans.GetComponent<Renderer>();
-            if (panelRenderer != null)
-            {
-                panelRenderer.material.color = BarColor; // Bright Green
-            }
+            if (panelRenderer != null) panelRenderer.material.color = BarColor;
         }
 
-        // Set global colors for other scripts to use
         Plugin.MainColour      = BaseColor;
         Plugin.SecondaryColour = BarColor;
 
+        // ----------------------------------------------------
+        // CHANGE BLATANT PROMO / TITLE TEXT
+        // ----------------------------------------------------
+        // We look for "BlatantPromo" first, if not found, we fallback to "Title"
+        Transform textObj = Menu.transform.Find("BlatantPromo");
+        
+        // If not found in root, check inside ModePanel
+        if (textObj == null && panelTrans != null) textObj = panelTrans.Find("BlatantPromo");
+        // Fallback to "Title" if BlatantPromo doesn't exist
+        if (textObj == null) textObj = Menu.transform.Find("Title");
+
+        if (textObj != null)
+        {
+            TextMeshPro textComp = textObj.GetComponent<TextMeshPro>();
+            if (textComp != null) 
+            {
+                // Set the specific text requested
+                textComp.text = "EIOP: (Everything In One Place)\nEdited by: WesGoof & Pico\nOriginal Mod: HanSolo1000Falcon";
+                
+                // Center the text
+                textComp.alignment = TextAlignmentOptions.Center;
+                
+                // Optional: Adjust font size so it fits nicely
+                textComp.enableAutoSizing = true;
+                textComp.fontSizeMin = 0.1f;
+                textComp.fontSizeMax = 10f;
+                
+                // Optional: Make text white so it is visible on green
+                textComp.color = Color.white;
+            }
+        }
+        // ----------------------------------------------------
+
         Menu.SetActive(false);
-        SetUpTabs(); // Buttons are colored inside here now
+        SetUpTabs();
 
         gameObject.AddComponent<PCHandler>().MenuHandlerInstance = this;
     }
@@ -99,44 +122,39 @@ public class MenuHandler : MonoBehaviour
         foreach (Type tabHandlerType in tabHandlerTypes)
         {
             string tabName = tabHandlerType.Name.Replace("Handler", "");
-            Transform tabView =
-                    tabViews.FirstOrDefault(t => t.gameObject.name.Equals(tabName + "View",
-                                                    StringComparison.OrdinalIgnoreCase));
-
-            Transform tabButton =
-                    tabButtons.FirstOrDefault(t => t.gameObject.name.Equals(tabName + "Button",
-                                                      StringComparison.OrdinalIgnoreCase));
+            
+            Transform tabView = tabViews.FirstOrDefault(t => t.gameObject.name.Equals(tabName + "View", StringComparison.OrdinalIgnoreCase));
+            Transform tabButton = tabButtons.FirstOrDefault(t => t.gameObject.name.Equals(tabName + "Button", StringComparison.OrdinalIgnoreCase));
 
             if (tabView == null || tabButton == null)
             {
-                Debug.LogWarning($"[MenuHandler] Could not find View or Button for tab: {tabName}");
+                Debug.LogWarning($"[MenuHandler] Missing View/Button for: {tabName}");
                 continue;
             }
 
-            // --- FIX: COLORING THE BUTTONS ---
-            // We use GetComponentInChildren because the Renderer might be inside the button object
+            // --- COLOR BUTTONS ---
             Renderer btnRenderer = tabButton.GetComponentInChildren<Renderer>();
-            if (btnRenderer != null)
+            if (btnRenderer != null) btnRenderer.material.color = BaseColor;
+            else if (tabButton.TryGetComponent(out Renderer directRenderer)) directRenderer.material.color = BaseColor;
+
+            // --- RENAME BUTTONS ---
+            TextMeshPro btnText = tabButton.GetComponentInChildren<TextMeshPro>();
+            if (btnText != null)
             {
-                // Make buttons Dark Green so they stand out against the Bright Green bar
-                btnRenderer.material.color = BaseColor; 
-            }
-            else 
-            {
-                // Backup: try to color the object itself if no children found
-                if(tabButton.TryGetComponent(out Renderer directRenderer))
+                if (tabName == "Room")           btnText.text = "LOBBY";
+                else if (tabName == "AntiCheat") btnText.text = "SECURITY";
+                else if (tabName == "Visuals")   btnText.text = "ESP";
+                else 
                 {
-                    directRenderer.material.color = BaseColor;
+                    btnText.text = tabName.ToUpper(); 
                 }
+                btnText.color = Color.white; 
             }
-            // ---------------------------------
 
             EIOPButton button = tabButton.gameObject.AddComponent<EIOPButton>();
             button.OnPress = () =>
                              {
-                                 foreach (Transform tab in tabViews)
-                                     tab.gameObject.SetActive(false);
-
+                                 foreach (Transform tab in tabViews) tab.gameObject.SetActive(false);
                                  tabView.gameObject.SetActive(true);
                              };
 
