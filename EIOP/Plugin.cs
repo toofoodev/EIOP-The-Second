@@ -1,8 +1,8 @@
-﻿using System;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Reflection;
 using BepInEx;
 using EIOP.Anti_Cheat;
@@ -11,6 +11,7 @@ using EIOP.Tools;
 using HarmonyLib;
 using Newtonsoft.Json;
 using UnityEngine;
+using UnityEngine.Networking; // Required for the fix
 
 namespace EIOP;
 
@@ -49,9 +50,17 @@ public class Plugin : BaseUnityPlugin
         PCHandler.ThirdPersonCameraTransform = GorillaTagger.Instance.thirdPersonCamera.transform.GetChild(0);
         PCHandler.ThirdPersonCamera          = PCHandler.ThirdPersonCameraTransform.GetComponent<Camera>();
 
+        // FIX: Check if resource exists before loading to prevent crash
         Stream bundleStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("EIOP.Resources.eiopbundle");
-        EIOPBundle = AssetBundle.LoadFromStream(bundleStream);
-        bundleStream.Close();
+        if (bundleStream != null)
+        {
+            EIOPBundle = AssetBundle.LoadFromStream(bundleStream);
+            bundleStream.Close();
+        }
+        else
+        {
+            Logger.LogError("EIOP: Could not find embedded resource 'EIOP.Resources.eiopbundle'. Make sure Build Action is set to Embedded Resource.");
+        }
 
         UberShader = Shader.Find("GorillaTag/UberShader");
 
@@ -73,31 +82,54 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<Notifications>();
         gameObject.AddComponent<MenuHandler>();
 
-        FetchModsAndCheats();
+        // FIX: Start Coroutine instead of blocking the thread
+        StartCoroutine(FetchModsAndCheatsCoroutine());
     }
 
-    private void FetchModsAndCheats()
+    // FIX: Replaced synchronous HttpClient with UnityWebRequest Coroutine
+    private IEnumerator FetchModsAndCheatsCoroutine()
     {
-        using HttpClient httpClient = new();
-        HttpResponseMessage gorillaInfoEndPointResponse =
-                httpClient.GetAsync(GorillaInfoEndPointURL + "KnownCheats.txt").Result;
-
-        using (Stream stream = gorillaInfoEndPointResponse.Content.ReadAsStreamAsync().Result)
+        // Fetch Known Cheats
+        using (UnityWebRequest www = UnityWebRequest.Get(GorillaInfoEndPointURL + "KnownCheats.txt"))
         {
-            using (StreamReader reader = new(stream))
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
             {
-                KnownCheats = JsonConvert.DeserializeObject<Dictionary<string, string>>(reader.ReadToEnd());
+                Logger.LogError($"EIOP: Failed to fetch cheats list. {www.error}");
+            }
+            else
+            {
+                try 
+                {
+                    KnownCheats = JsonConvert.DeserializeObject<Dictionary<string, string>>(www.downloadHandler.text);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"EIOP: Error parsing KnownCheats JSON: {ex.Message}");
+                }
             }
         }
 
-        HttpResponseMessage knownModsEndPointResponse =
-                httpClient.GetAsync(GorillaInfoEndPointURL + "KnownMods.txt").Result;
-
-        using (Stream stream = knownModsEndPointResponse.Content.ReadAsStreamAsync().Result)
+        // Fetch Known Mods
+        using (UnityWebRequest www = UnityWebRequest.Get(GorillaInfoEndPointURL + "KnownMods.txt"))
         {
-            using (StreamReader reader = new(stream))
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
             {
-                KnownMods = JsonConvert.DeserializeObject<Dictionary<string, string>>(reader.ReadToEnd());
+                Logger.LogError($"EIOP: Failed to fetch mods list. {www.error}");
+            }
+            else
+            {
+                try
+                {
+                    KnownMods = JsonConvert.DeserializeObject<Dictionary<string, string>>(www.downloadHandler.text);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"EIOP: Error parsing KnownMods JSON: {ex.Message}");
+                }
             }
         }
     }
@@ -107,10 +139,18 @@ public class Plugin : BaseUnityPlugin
         using Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourcePath);
 
         if (stream == null)
+        {
+            Logger.LogError($"EIOP: Failed to load audio resource {resourcePath}");
             return null;
+        }
 
-        byte[] buffer = new byte[stream.Length];
-        int    read   = stream.Read(buffer, 0, buffer.Length);
+        // FIX: Ensure complete read of the stream
+        byte[] buffer;
+        using (MemoryStream ms = new MemoryStream())
+        {
+            stream.CopyTo(ms);
+            buffer = ms.ToArray();
+        }
 
         WAV     wav = new(buffer);
         float[] samples;
