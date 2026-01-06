@@ -27,7 +27,7 @@ public static class Extensions
     {
         return gamePlatform switch
                {
-                       GamePlatform.Unknown    => "<color=#000000>idk :sob:</color>",
+                       GamePlatform.Unknown    => "<color=#000000>Unknown</color>",
                        GamePlatform.Steam      => "<color=#0091F7>Steam</color>",
                        GamePlatform.OculusPC   => "<color=#0091F7>OVR</color>",
                        GamePlatform.PC         => "<color=#000000>PC</color>",
