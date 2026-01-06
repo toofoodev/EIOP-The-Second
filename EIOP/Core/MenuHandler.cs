@@ -39,10 +39,10 @@ public class MenuHandler : MonoBehaviour
         // 1. Fix Shaders & Restore Icons
         PerformShaderManagement(Menu);
 
-        // 2. Apply Background Colors (Menu=Dark, Panels=Bright)
+        // 2. Apply Background Colors (Menu & Panels)
         ApplyBackgroundColors();
 
-        // 3. Color Buttons (Dark Green) & Protect Icons (White)
+        // 3. Color Buttons (Anything in panels = Button)
         ColorAllButtonsInMenu();
 
         // 4. Fix Title Text
@@ -76,44 +76,47 @@ public class MenuHandler : MonoBehaviour
             if (sideRenderer != null) sideRenderer.material.color = BrightGreen;
         }
 
-        // Global Settings
         Plugin.MainColour      = DarkGreen;
         Plugin.SecondaryColour = BrightGreen;
     }
 
     private void ColorAllButtonsInMenu()
     {
-        // Get EVERY Renderer inside the menu
         Renderer[] allRenderers = Menu.GetComponentsInChildren<Renderer>(true);
+        Transform modePanel = Menu.transform.Find("ModePanel");
+        Transform sidePanel = Menu.transform.Find("SidePanel");
 
         foreach (Renderer rend in allRenderers)
         {
-            // --- CRITICAL ICON FIX ---
-            // If the material has a texture (MainTex), it is an ICON.
-            // Icons must be WHITE to show up correctly.
-            // If we color them Dark Green, the icon becomes invisible.
+            // --- 1. ICON CHECK (PRIORITY) ---
+            // If it has a texture, it is an Icon. Keep it WHITE.
             if (rend.material.mainTexture != null)
             {
                 rend.material.color = Color.white; 
-                continue; // Skip the rest of the loop for this object
+                continue; 
             }
 
-            // --- BUTTON COLORING ---
-            // If it has NO texture, it is a button background. Color it Dark Green.
-            
+            // --- 2. HIERARCHY CHECK ---
+            // Check if this object is inside ModePanel or SidePanel
+            bool insideModePanel = modePanel != null && rend.transform.IsChildOf(modePanel);
+            bool insideSidePanel = sidePanel != null && rend.transform.IsChildOf(sidePanel);
+
+            // If it's inside one of the panels (and not an icon), it is a BUTTON.
+            if (insideModePanel || insideSidePanel)
+            {
+                rend.material.color = DarkGreen;
+                continue;
+            }
+
+            // --- 3. GENERIC BUTTON CHECK ---
             string objName = rend.gameObject.name;
             Transform parent = rend.transform.parent;
             string parentName = parent != null ? parent.name : "";
 
-            // Check if it's inside a Panel
-            bool isBarButton = parentName.Equals("ModePanel", StringComparison.OrdinalIgnoreCase) || 
-                               parentName.Equals("SidePanel", StringComparison.OrdinalIgnoreCase);
-
-            // Check if it's a Main Menu button
             bool isButton = objName.Contains("Button") || parentName.Contains("Button");
             bool isSpecificType = objName.Equals("ButtonType1") || objName.Equals("ButtonType2") || objName.Equals("SoundboardButton");
 
-            if (isBarButton || isButton || isSpecificType)
+            if (isButton || isSpecificType)
             {
                 rend.material.color = DarkGreen;
             }
@@ -170,6 +173,7 @@ public class MenuHandler : MonoBehaviour
 
         List<Transform> tabButtons = new List<Transform>();
 
+        // Find buttons in ModePanel
         Transform modePanel = Menu.transform.Find("ModePanel");
         if (modePanel != null)
         {
@@ -177,6 +181,7 @@ public class MenuHandler : MonoBehaviour
                                   .Where(t => t.gameObject.name.EndsWith("Button", StringComparison.OrdinalIgnoreCase)));
         }
 
+        // Find buttons in SidePanel
         Transform sidePanel = Menu.transform.Find("SidePanel");
         if (sidePanel != null)
         {
@@ -193,14 +198,24 @@ public class MenuHandler : MonoBehaviour
 
             if (tabView == null || tabButton == null) continue; 
 
+            // --- TEXT EDITING LOGIC ---
             TextMeshPro btnText = tabButton.GetComponentInChildren<TextMeshPro>();
+            
+            // Check if this is a Special Button Type (Type 1 or 2) - likely has custom icons
+            bool isSpecialMesh = tabButton.name.Contains("ButtonType1") || tabButton.name.Contains("ButtonType2");
+
             if (btnText != null)
             {
-                if (tabName == "Room")           btnText.text = "LOBBY";
-                else if (tabName == "AntiCheat") btnText.text = "SECURITY";
-                else if (tabName == "Visuals")   btnText.text = "ESP";
-                else btnText.text = tabName.ToUpper(); 
+                // Only rename if it is NOT a special mesh
+                if (!isSpecialMesh)
+                {
+                    if (tabName == "Room")           btnText.text = "LOBBY";
+                    else if (tabName == "AntiCheat") btnText.text = "SECURITY";
+                    else if (tabName == "Visuals")   btnText.text = "ESP";
+                    else btnText.text = tabName.ToUpper(); 
+                }
                 
+                // Ensure text is visible
                 btnText.color = Color.white; 
             }
 
@@ -242,8 +257,6 @@ public class MenuHandler : MonoBehaviour
                     renderer.material.mainTexture = originalTexture;
                     renderer.material.EnableKeyword("_USE_TEXTURE");
                 }
-                
-                // Default to white logic handled in ColorAllButtonsInMenu
             }
         }
 
