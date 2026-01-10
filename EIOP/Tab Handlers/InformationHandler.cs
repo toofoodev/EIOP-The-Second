@@ -169,7 +169,7 @@ public class InformationHandler : TabHandlerBase
             CosmeticsController.CosmeticSet cosmeticSet = chosenRig.cosmeticSet;
             foreach (CosmeticsController.CosmeticItem cosmetic in cosmeticSet.items)
                 if (!cosmetic.isNullItem &&
-                    !chosenRig.concatStringOfCosmeticsAllowed.Contains(cosmetic.itemName))
+                    !chosenRig.rawCosmeticString.Contains(cosmetic.itemName))
                 {
                     hasCosmetx = true;
 

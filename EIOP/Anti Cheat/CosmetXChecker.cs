@@ -23,7 +23,7 @@ public class CosmetXChecker : AntiCheatHandlerBase
 
             CosmeticsController.CosmeticSet cosmeticSet = rig.cosmeticSet;
             if (cosmeticSet.items.Any(cosmetic => !cosmetic.isNullItem &&
-                                                  !rig.concatStringOfCosmeticsAllowed.Contains(cosmetic.itemName)))
+                                                  !rig.rawCosmeticString.Contains(cosmetic.itemName)))
                 hasCosmetx = true;
 
             switch (hasCosmetx)

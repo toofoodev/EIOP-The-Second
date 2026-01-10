@@ -36,16 +36,9 @@ public class MenuHandler : MonoBehaviour
         Menu.transform.localRotation = BaseMenuRotation;
         Menu.transform.localScale    = Vector3.zero;
 
-        // 1. Fix Shaders & Restore Icons
         PerformShaderManagement(Menu);
-
-        // 2. Apply Background Colors (Menu & Panels)
         ApplyBackgroundColors();
-
-        // 3. Color Buttons (Anything in panels = Button)
         ColorAllButtonsInMenu();
-
-        // 4. Fix Title Text
         UpdateTitleText();
 
         Menu.SetActive(false);
@@ -54,13 +47,26 @@ public class MenuHandler : MonoBehaviour
         gameObject.AddComponent<PCHandler>().MenuHandlerInstance = this;
     }
 
+    // ----------------------------------
+    // VERSION CHECK (STRING BASED)
+    // ----------------------------------
+    private bool IsPluginOutdated()
+    {
+        // If version hasn't been fetched yet, allow menu
+        if (Plugin.Instance == null || string.IsNullOrEmpty(Plugin.Instance.NewestVer))
+            return false;
+
+        string current = Constants.PluginVersion.Trim();
+        string latest  = Plugin.Instance.NewestVer.Trim();
+
+        return !current.Equals(latest, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void ApplyBackgroundColors()
     {
-        // 1. Main Menu Background -> DARK GREEN
         Renderer mainRenderer = Menu.GetComponent<Renderer>();
         if (mainRenderer != null) mainRenderer.material.color = DarkGreen;
 
-        // 2. ModePanel (Bottom Bar) -> BRIGHT GREEN
         Transform modePanel = Menu.transform.Find("ModePanel");
         if (modePanel != null)
         {
@@ -68,7 +74,6 @@ public class MenuHandler : MonoBehaviour
             if (panelRenderer != null) panelRenderer.material.color = BrightGreen;
         }
 
-        // 3. SidePanel (Side Bar) -> BRIGHT GREEN
         Transform sidePanel = Menu.transform.Find("SidePanel");
         if (sidePanel != null)
         {
@@ -76,50 +81,39 @@ public class MenuHandler : MonoBehaviour
             if (sideRenderer != null) sideRenderer.material.color = BrightGreen;
         }
 
-        Plugin.MainColour      = DarkGreen;
-        Plugin.SecondaryColour = BrightGreen;
+        Plugin.MainColour      = BrightGreen;
+        Plugin.SecondaryColour = DarkGreen;
     }
 
     private void ColorAllButtonsInMenu()
     {
         Renderer[] allRenderers = Menu.GetComponentsInChildren<Renderer>(true);
+
         Transform modePanel = Menu.transform.Find("ModePanel");
         Transform sidePanel = Menu.transform.Find("SidePanel");
 
         foreach (Renderer rend in allRenderers)
         {
-            // --- 1. ICON CHECK (PRIORITY) ---
-            // If it has a texture, it is an Icon. Keep it WHITE.
-            if (rend.material.mainTexture != null)
+            // --- 1. IMAGE RULE ---
+            if (rend.gameObject.name.Equals("Image", StringComparison.OrdinalIgnoreCase))
             {
-                rend.material.color = Color.white; 
-                continue; 
-            }
-
-            // --- 2. HIERARCHY CHECK ---
-            // Check if this object is inside ModePanel or SidePanel
-            bool insideModePanel = modePanel != null && rend.transform.IsChildOf(modePanel);
-            bool insideSidePanel = sidePanel != null && rend.transform.IsChildOf(sidePanel);
-
-            // If it's inside one of the panels (and not an icon), it is a BUTTON.
-            if (insideModePanel || insideSidePanel)
-            {
-                rend.material.color = DarkGreen;
+                rend.material.color = Color.white;
+                // Set rotation for images
+                rend.transform.localRotation = Quaternion.Euler(-90f, 0f, -180f);
                 continue;
             }
 
-            // --- 3. GENERIC BUTTON CHECK ---
-            string objName = rend.gameObject.name;
-            Transform parent = rend.transform.parent;
-            string parentName = parent != null ? parent.name : "";
+            // --- 2. PANEL BACKGROUNDS ONLY (NOT CHILDREN) ---
+            bool isModePanel = modePanel != null && rend.transform == modePanel;
+            bool isSidePanel = sidePanel != null && rend.transform == sidePanel;
 
-            bool isButton = objName.Contains("Button") || parentName.Contains("Button");
-            bool isSpecificType = objName.Equals("ButtonType1") || objName.Equals("ButtonType2") || objName.Equals("SoundboardButton");
-
-            if (isButton || isSpecificType)
+            if (isModePanel || isSidePanel)
             {
-                rend.material.color = DarkGreen;
+                continue; // leave panel color as is
             }
+
+            // --- 3. EVERYTHING ELSE = BUTTON ---
+            rend.material.color = DarkGreen;
         }
     }
 
@@ -138,7 +132,7 @@ public class MenuHandler : MonoBehaviour
             TextMeshPro textComp = textObj.GetComponent<TextMeshPro>();
             if (textComp != null) 
             {
-                textComp.text = "EIOP: (Everything In One Place)\nEdited by: WesGoof & Pico\nOriginal Mod: HanSolo1000Falcon";
+                textComp.text = "EIOP The Second:\nEdited by: WesGoof & Pico\nOriginal Mod: https://github.com/hansolo1000falcon/eiop/releases/latest";
                 textComp.alignment = TextAlignmentOptions.Center;
                 textComp.enableAutoSizing = true;
                 textComp.fontSizeMin = 0.1f;
@@ -154,6 +148,30 @@ public class MenuHandler : MonoBehaviour
 
         if (isPressed && !wasPressed)
         {
+            // ----------------------------------
+            // BLOCK MENU IF OUTDATED
+            // ----------------------------------
+            if (IsPluginOutdated())
+            {
+                Notifications.SendNotification(
+                    $"<color=red>OUTDATED VERSION</color>\n" +
+                    $"Current: {Constants.PluginVersion}\n" +
+                    $"Latest: {Plugin.Instance.NewestVer}\n\n" +
+                    $"Please update to use the menu."
+                );
+
+                // Force menu closed
+                if (IsMenuOpen)
+                {
+                    IsMenuOpen = false;
+                    CoroutineManager.Instance.StartCoroutine(CloseMenu());
+                }
+
+                wasPressed = isPressed;
+                return;
+            }
+
+            // Normal toggle
             IsMenuOpen = !IsMenuOpen;
             CoroutineManager.Instance.StartCoroutine(IsMenuOpen ? OpenMenu() : CloseMenu());
         }
@@ -173,7 +191,6 @@ public class MenuHandler : MonoBehaviour
 
         List<Transform> tabButtons = new List<Transform>();
 
-        // Find buttons in ModePanel
         Transform modePanel = Menu.transform.Find("ModePanel");
         if (modePanel != null)
         {
@@ -181,7 +198,6 @@ public class MenuHandler : MonoBehaviour
                                   .Where(t => t.gameObject.name.EndsWith("Button", StringComparison.OrdinalIgnoreCase)));
         }
 
-        // Find buttons in SidePanel
         Transform sidePanel = Menu.transform.Find("SidePanel");
         if (sidePanel != null)
         {
@@ -198,24 +214,14 @@ public class MenuHandler : MonoBehaviour
 
             if (tabView == null || tabButton == null) continue; 
 
-            // --- TEXT EDITING LOGIC ---
             TextMeshPro btnText = tabButton.GetComponentInChildren<TextMeshPro>();
-            
-            // Check if this is a Special Button Type (Type 1 or 2) - likely has custom icons
-            bool isSpecialMesh = tabButton.name.Contains("ButtonType1") || tabButton.name.Contains("ButtonType2");
-
             if (btnText != null)
             {
-                // Only rename if it is NOT a special mesh
-                if (!isSpecialMesh)
-                {
-                    if (tabName == "Room")           btnText.text = "LOBBY";
-                    else if (tabName == "AntiCheat") btnText.text = "SECURITY";
-                    else if (tabName == "Visuals")   btnText.text = "ESP";
-                    else btnText.text = tabName.ToUpper(); 
-                }
-                
-                // Ensure text is visible
+                if (tabName == "Room") btnText.text = "LOBBY";
+                else if (tabName == "AntiCheat") btnText.text = "SECURITY";
+                else if (tabName == "Visuals") btnText.text = "ESP";
+                else btnText.text = tabName.ToUpper(); 
+
                 btnText.color = Color.white; 
             }
 
@@ -236,46 +242,52 @@ public class MenuHandler : MonoBehaviour
         foreach (Transform child in obj.transform)
             PerformShaderManagement(child.gameObject);
 
-        // 1. HANDLE RENDERERS
         if (obj.TryGetComponent(out Renderer renderer))
         {
             if (!(renderer is ParticleSystemRenderer))
             {
-                // Capture texture BEFORE changing shader
                 Texture originalTexture = renderer.material.mainTexture;
-                
-                // Fallback for URP textures
+
                 if (originalTexture == null && renderer.material.HasProperty("_BaseMap"))
                     originalTexture = renderer.material.GetTexture("_BaseMap");
 
-                // Switch Shader
                 renderer.material.shader = Plugin.UberShader;
-                
-                // RESTORE TEXTURE (Critical for Icons)
+
                 if (originalTexture != null)
                 {
                     renderer.material.mainTexture = originalTexture;
                     renderer.material.EnableKeyword("_USE_TEXTURE");
                 }
+
+                renderer.material.color = Color.white; 
             }
         }
 
-        // 2. HANDLE TEXT
         if (obj.TryGetComponent(out TextMeshPro tmp))
         {
-            tmp.fontMaterial = new Material(tmp.fontMaterial) { shader = Shader.Find("TextMeshPro/Mobile/Distance Field") };
+            tmp.fontMaterial = new Material(tmp.fontMaterial)
+            {
+                shader = Shader.Find("TextMeshPro/Mobile/Distance Field")
+            };
             tmp.color = Color.white; 
         }
 
         if (obj.TryGetComponent(out TextMeshProUGUI tmpUGUI))
         {
-            tmpUGUI.fontMaterial = new Material(tmpUGUI.fontMaterial) { shader = Shader.Find("TextMeshPro/Mobile/Distance Field") };
+            tmpUGUI.fontMaterial = new Material(tmpUGUI.fontMaterial)
+            {
+                shader = Shader.Find("TextMeshPro/Mobile/Distance Field")
+            };
             tmpUGUI.color = Color.white;
         }
     }
 
     public IEnumerator OpenMenu()
     {
+        // Extra safety: never open if outdated
+        if (IsPluginOutdated())
+            yield break;
+
         Menu.SetActive(true);
         Menu.transform.localScale = Vector3.zero;
         float startTime = Time.time;
@@ -284,7 +296,6 @@ public class MenuHandler : MonoBehaviour
         {
             float t = (Time.time - startTime) / 0.1f;
             Menu.transform.localScale = Vector3.Lerp(Vector3.zero, TargetMenuScale, t);
-
             yield return null;
         }
 
@@ -300,7 +311,6 @@ public class MenuHandler : MonoBehaviour
         {
             float t = (Time.time - startTime) / 0.1f;
             Menu.transform.localScale = Vector3.Lerp(TargetMenuScale, Vector3.zero, t);
-
             yield return null;
         }
 

@@ -280,7 +280,6 @@
 
     <ItemGroup>
         <None Remove="Resources\eiopbundle"/>
-        <EmbeddedResource Include="Resources\eiopbundle"/>
         <None Remove="Resources\ButtonPressWood.wav"/>
         <EmbeddedResource Include="Resources\ButtonPressWood.wav"/>
     </ItemGroup>
@@ -290,5 +289,9 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Include="Resources\eiopbundle" />
     </ItemGroup>
 </Project>

@@ -21,8 +21,15 @@ public class Plugin : BaseUnityPlugin
     private const string GorillaInfoEndPointURL =
             "https://raw.githubusercontent.com/toofoodev/gorinf/main/";
 
+    // ----------------------------
+    // VERSION CHECK URL
+    // ----------------------------
+    private const string VersionURL =
+            "https://raw.githubusercontent.com/toofoodev/gorinf/main/EIOP2Ver.txt";
+
     public static Dictionary<string, string> KnownCheats;
     public static Dictionary<string, string> KnownMods;
+    public string NewestVer;
 
     public static AssetBundle EIOPBundle;
     public static Shader      UberShader;
@@ -36,6 +43,13 @@ public class Plugin : BaseUnityPlugin
     // Prevents the mod from loading twice if the player joins a new room
     private bool _initialized = false;
 
+    public static Plugin Instance;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
+    
     private void Start()
     {
         new Harmony(Constants.PluginGuid).PatchAll();
@@ -92,8 +106,9 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<Notifications>();
         gameObject.AddComponent<MenuHandler>();
 
-        // Start Web Request without freezing game
+        // Start Web Requests
         StartCoroutine(FetchModsAndCheatsCoroutine());
+        StartCoroutine(CheckForUpdatesCoroutine()); // <-- VERSION CHECK
     }
 
     private IEnumerator FetchModsAndCheatsCoroutine()
@@ -139,6 +154,48 @@ public class Plugin : BaseUnityPlugin
                 {
                     Logger.LogError($"EIOP: Error parsing KnownMods JSON: {ex.Message}");
                 }
+            }
+        }
+    }
+
+    // ----------------------------------
+    // VERSION CHECK COROUTINE
+    // ----------------------------------
+    private IEnumerator CheckForUpdatesCoroutine()
+    {
+        using (UnityWebRequest www = UnityWebRequest.Get(VersionURL))
+        {
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Logger.LogError($"EIOP: Failed to check version. {www.error}");
+                yield break;
+            }
+
+            // Read version from GitHub
+            NewestVer = www.downloadHandler.text.Trim();
+
+            if (string.IsNullOrEmpty(NewestVer))
+            {
+                Logger.LogError("EIOP: Version file was empty.");
+                yield break;
+            }
+
+            // Compare with current plugin version
+            if (Constants.PluginVersion != NewestVer)
+            {
+                Notifications.SendNotification(
+                    $"<color=red>Update Available</color>\n" +
+                    $"Current: {Constants.PluginVersion}\n" +
+                    $"Latest: {NewestVer}"
+                );
+
+                Logger.LogWarning($"EIOP: Outdated version. Current: {Constants.PluginVersion}, Latest: {NewestVer}");
+            }
+            else
+            {
+                Logger.LogInfo("EIOP: Plugin is up to date.");
             }
         }
     }

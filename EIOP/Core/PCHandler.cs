@@ -14,14 +14,11 @@ public class PCHandler : MonoBehaviour
 
     private void Update()
     {
-        // CHANGED: Tab -> J
         if (UnityInput.Current.GetKeyDown(KeyCode.J))
         {
             MenuHandlerInstance.IsMenuOpen = !MenuHandlerInstance.IsMenuOpen;
-            
             if (MenuHandlerInstance.IsMenuOpen)
             {
-                // Move menu to the PC Camera so you can see it
                 MenuHandlerInstance.Menu.transform.SetParent(ThirdPersonCameraTransform, false);
                 MenuHandlerInstance.Menu.transform.localPosition = new Vector3(0f, 0f, 0.6f);
                 MenuHandlerInstance.Menu.transform.localRotation = Quaternion.Euler(270f, 180f, 0f);
@@ -32,12 +29,10 @@ public class PCHandler : MonoBehaviour
                                                              : CloseMenu());
         }
 
-        // Logic for clicking buttons with the mouse
         if (MenuHandlerInstance.IsMenuOpen && Mouse.current.leftButton.wasPressedThisFrame)
         {
             Ray ray = ThirdPersonCamera.ScreenPointToRay(UnityInput.Current.mousePosition);
 
-            // LayerMask check for clickable items
             if (!Physics.Raycast(ray, out RaycastHit hit, 2f, UnityLayerMask.GorillaInteractable.GetIndex()))
                 return;
 
@@ -49,8 +44,6 @@ public class PCHandler : MonoBehaviour
     private IEnumerator CloseMenu()
     {
         yield return MenuHandlerInstance.CloseMenu();
-        
-        // Return menu to the VR controller
         MenuHandlerInstance.Menu.transform.SetParent(EIOPUtils.RealLeftController, false);
         MenuHandlerInstance.Menu.transform.localPosition = MenuHandler.BaseMenuPosition;
         MenuHandlerInstance.Menu.transform.localRotation = MenuHandler.BaseMenuRotation;

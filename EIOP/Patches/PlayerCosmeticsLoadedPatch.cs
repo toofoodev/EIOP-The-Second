@@ -66,7 +66,7 @@ public static class PlayerCosmeticsLoadedPatch
 
         EIOPUtils.OnPlayerCosmeticsLoaded?.Invoke(rig);
 
-        string cosmeticsAllowed = rig.concatStringOfCosmeticsAllowed.ToLower();
+        string cosmeticsAllowed = rig.rawCosmeticString.ToLower();
 
         if (cosmeticsAllowed.Contains("s. first login"))
         {
